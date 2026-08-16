@@ -16,10 +16,10 @@ jobs:
 
     - name: Clone Toolchains and Repositories
       run: |
-        # Separate clone commands with absolute URL configurations
-        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
-        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
-        git clone --depth=1 https://github.com/gta3xlwifi-dev/android_kernel_gta3xlwifi -b lineage-18.1 kernel
+        git clone --depth=1 https://github.com gcc64
+        git clone --depth=1 https://github.com gcc32
+        # Removed the broken -b branch parameter to force cloning the default development tree cleanly
+        git clone --depth=1 https://github.com kernel
         git clone --depth=1 https://github.com AnyKernel3
 
     - name: Patch NetHunter Kernel Defconfig
@@ -44,7 +44,6 @@ jobs:
     - name: Compile Kernel
       working-directory: kernel
       run: |
-        # Use native workspace variables to map the compiler paths cleanly
         export PATH="$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
@@ -56,7 +55,6 @@ jobs:
 
     - name: Package with AnyKernel3
       run: |
-        # Search for whatever binary format the Samsung source outputs
         if [ -f kernel/arch/arm64/boot/Image.gz-dtb ]; then
           cp kernel/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         elif [ -f kernel/arch/arm64/boot/Image.gz ]; then
