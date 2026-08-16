@@ -1,7 +1,7 @@
 name: Build NetHunter Kernel gta3xlwifi
 
 on:
-  workflow_dispatch: # Allows you to trigger the build manually with one click
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -10,15 +10,19 @@ jobs:
     steps:
     - name: Install System Dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y bc build-essential libncurses5-dev libssl-dev xz-utils bterm git bison flex libelf-dev clang lld llvm zip
+        # Fix the apt-get update crash by forcing it to ignore repository download errors
+        sudo apt-get update --allow-releaseinfo-change || true
+        sudo apt-get update -o Acquire::ForceIPv4=true --fix-missing || true
+        
+        # Install dependencies, bypassing any missing third-party repo links
+        sudo apt-get install -y --fix-missing bc build-essential libncurses5-dev libssl-dev xz-utils bterm git bison flex libelf-dev clang lld llvm zip
 
-    - name: Download GCC Toolchains
+    - name: Download Google Android Toolchains
       run: |
         mkdir -p $GITHUB_WORKSPACE/toolchain
         cd $GITHUB_WORKSPACE/toolchain
-        git clone --depth=1 https://github.com gcc64
-        git clone --depth=1 https://github.com gcc32
+        git clone --depth=1 https://googlesource.com -b android-10.0.0_r47 gcc64
+        git clone --depth=1 https://googlesource.com -b android-10.0.0_r47 gcc32
 
     - name: Clone Kernel Source
       run: |
@@ -33,17 +37,14 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel
         DEFCONFIG="arch/arm64/configs/gta3xlwifi_defconfig"
         
-        # Enable WLAN Monitor Mode & Packet Injection options
+        sed -i 's/CONFIG_CFG80211=m/CONFIG_CFG80211=y/g' $DEFCONFIG || true
+        
         echo "CONFIG_CFG80211=y" >> $DEFCONFIG
         echo "CONFIG_MAC80211=y" >> $DEFCONFIG
         echo "CONFIG_CFG80211_WEXT=y" >> $DEFCONFIG
-        
-        # Enable HID Gadget (BadUSB / KeX Keyboard Emulation)
         echo "CONFIG_USB_G_ANDROID=y" >> $DEFCONFIG
         echo "CONFIG_USB_F_HID=y" >> $DEFCONFIG
         echo "CONFIG_USB_CONFIGFS_F_HID=y" >> $DEFCONFIG
-        
-        # Drivers for standard external USB Wi-Fi cards (Atheros / Realtek)
         echo "CONFIG_ATH_CARDS=y" >> $DEFCONFIG
         echo "CONFIG_ATH9K_HTC=m" >> $DEFCONFIG
         echo "CONFIG_CARL9170=m" >> $DEFCONFIG
@@ -55,18 +56,22 @@ jobs:
         export PATH="$GITHUB_WORKSPACE/toolchain/gcc64/bin:$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
-        export CROSS_COMPILE=aarch64-linux-gnu-
-        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        export CROSS_COMPILE=aarch64-linux-android-
+        export CROSS_COMPILE_ARM32=arm-linux-androideabi-
         
-        # Load the configuration file
         make gta3xlwifi_defconfig
-        
-        # Build the kernel binary using all available CPU threads
-        make -j$(nproc)
+        make -j$(nproc) KCFLAGS="-w"
 
     - name: Package with AnyKernel3
       run: |
-        cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image.gz-dtb $GITHUB_WORKSPACE/AnyKernel3/
+        if [ -f $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image.gz-dtb ]; then
+          cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image.gz-dtb $GITHUB_WORKSPACE/AnyKernel3/
+        elif [ -f $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image ]; then
+          cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image $GITHUB_WORKSPACE/AnyKernel3/
+        else
+          echo "Kernel image compilation failed entirely." && exit 1
+        fi
+        
         cd $GITHUB_WORKSPACE/AnyKernel3
         zip -r9 ../NetHunter-Kernel-gta3xlwifi.zip * -x .git* README.md
 
