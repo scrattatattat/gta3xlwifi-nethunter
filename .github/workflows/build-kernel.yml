@@ -14,26 +14,22 @@ jobs:
         sudo apt-get update -o Acquire::ForceIPv4=true --fix-missing || true
         sudo apt-get install -y --fix-missing bc build-essential libncurses5-dev libssl-dev xz-utils git bison flex libelf-dev clang lld llvm zip
 
-    - name: Download GCC Toolchains from GitHub Mirror
+    - name: Clone Toolchains and Repositories
       run: |
-        # Explicitly targets target directories without using 'cd' to keep the URL parser intact
-        git clone --depth=1 https://github.com toolchain/gcc64
-        git clone --depth=1 https://github.com toolchain/gcc32
-
-    - name: Clone Kernel Source
-      run: |
-        git clone --depth=1 https://github.com -b lineage-18.1 kernel
-
-    - name: Clone AnyKernel3 Flash Template
-      run: |
+        # Separate clone commands with absolute URL configurations
+        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
+        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
+        git clone --depth=1 https://github.com/gta3xlwifi-dev/android_kernel_gta3xlwifi -b lineage-18.1 kernel
         git clone --depth=1 https://github.com AnyKernel3
 
     - name: Patch NetHunter Kernel Defconfig
       run: |
         DEFCONFIG="kernel/arch/arm64/configs/gta3xlwifi_defconfig"
         
+        # Ensure cfg80211 is built-in instead of a module
         sed -i 's/CONFIG_CFG80211=m/CONFIG_CFG80211=y/g' $DEFCONFIG || true
         
+        # Inject required NetHunter hardware options
         echo "CONFIG_CFG80211=y" >> $DEFCONFIG
         echo "CONFIG_MAC80211=y" >> $DEFCONFIG
         echo "CONFIG_CFG80211_WEXT=y" >> $DEFCONFIG
@@ -46,10 +42,10 @@ jobs:
         echo "CONFIG_USB_NET_RNDIS_WLAN=m" >> $DEFCONFIG
 
     - name: Compile Kernel
+      working-directory: kernel
       run: |
-        cd kernel
-        # Binds standard path extensions directly to local workspace folders
-        export PATH="$GITHUB_WORKSPACE/toolchain/gcc64/bin:$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH"
+        # Use native workspace variables to map the compiler paths cleanly
+        export PATH="$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         export CROSS_COMPILE=aarch64-linux-android-
@@ -60,7 +56,7 @@ jobs:
 
     - name: Package with AnyKernel3
       run: |
-        # Checks compiling targets sequentially to protect the zip engine from failing
+        # Search for whatever binary format the Samsung source outputs
         if [ -f kernel/arch/arm64/boot/Image.gz-dtb ]; then
           cp kernel/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         elif [ -f kernel/arch/arm64/boot/Image.gz ]; then
