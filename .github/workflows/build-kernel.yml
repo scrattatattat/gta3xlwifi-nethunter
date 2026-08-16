@@ -16,14 +16,13 @@ jobs:
 
     - name: Download GCC Toolchains from GitHub Mirror
       run: |
-        mkdir -p toolchain
-        cd toolchain
-        git clone --depth=1 https://github.com gcc64
-        git clone --depth=1 https://github.com gcc32
+        # Explicitly targets target directories without using 'cd' to keep the URL parser intact
+        git clone --depth=1 https://github.com toolchain/gcc64
+        git clone --depth=1 https://github.com toolchain/gcc32
 
     - name: Clone Kernel Source
       run: |
-        git clone --depth=1 https://github.com/gta3xlwifi-dev/android_kernel_gta3xlwifi -b lineage-18.1 kernel
+        git clone --depth=1 https://github.com -b lineage-18.1 kernel
 
     - name: Clone AnyKernel3 Flash Template
       run: |
@@ -31,8 +30,7 @@ jobs:
 
     - name: Patch NetHunter Kernel Defconfig
       run: |
-        cd kernel
-        DEFCONFIG="arch/arm64/configs/gta3xlwifi_defconfig"
+        DEFCONFIG="kernel/arch/arm64/configs/gta3xlwifi_defconfig"
         
         sed -i 's/CONFIG_CFG80211=m/CONFIG_CFG80211=y/g' $DEFCONFIG || true
         
@@ -50,7 +48,7 @@ jobs:
     - name: Compile Kernel
       run: |
         cd kernel
-        # Explicit path configuration mapped directly to the local runner directory
+        # Binds standard path extensions directly to local workspace folders
         export PATH="$GITHUB_WORKSPACE/toolchain/gcc64/bin:$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
@@ -62,7 +60,7 @@ jobs:
 
     - name: Package with AnyKernel3
       run: |
-        # Fallback verification engine for the target generated output images
+        # Checks compiling targets sequentially to protect the zip engine from failing
         if [ -f kernel/arch/arm64/boot/Image.gz-dtb ]; then
           cp kernel/arch/arm64/boot/Image.gz-dtb AnyKernel3/
         elif [ -f kernel/arch/arm64/boot/Image.gz ]; then
