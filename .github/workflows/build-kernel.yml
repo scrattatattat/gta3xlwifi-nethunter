@@ -10,12 +10,11 @@ jobs:
     steps:
     - name: Install System Dependencies
       run: |
-        # Fix the apt-get update crash by forcing it to ignore repository download errors
         sudo apt-get update --allow-releaseinfo-change || true
         sudo apt-get update -o Acquire::ForceIPv4=true --fix-missing || true
         
-        # Install dependencies, bypassing any missing third-party repo links
-        sudo apt-get install -y --fix-missing bc build-essential libncurses5-dev libssl-dev xz-utils bterm git bison flex libelf-dev clang lld llvm zip
+        # Removed bterm to prevent the 'Unable to locate package' halt
+        sudo apt-get install -y --fix-missing bc build-essential libncurses5-dev libssl-dev xz-utils git bison flex libelf-dev clang lld llvm zip
 
     - name: Download Google Android Toolchains
       run: |
