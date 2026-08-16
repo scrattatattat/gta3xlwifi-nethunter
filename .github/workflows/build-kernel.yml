@@ -16,23 +16,23 @@ jobs:
 
     - name: Download GCC Toolchains from GitHub Mirror
       run: |
-        mkdir -p $GITHUB_WORKSPACE/toolchain
-        cd $GITHUB_WORKSPACE/toolchain
-        # Clone official Android 4.9 GCC toolchains from stable GitHub mirrors
-        git clone --depth=1 https://github.com gcc64
-        git clone --depth=1 https://github.com gcc32
+        mkdir -p toolchain
+        cd toolchain
+        # Using explicit pathing to fix the URL parsing breakage
+        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
+        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
 
     - name: Clone Kernel Source
       run: |
-        git clone --depth=1 https://github.com -b lineage-18.1 $GITHUB_WORKSPACE/kernel
+        git clone --depth=1 https://github.com -b lineage-18.1 kernel
 
     - name: Clone AnyKernel3 Flash Template
       run: |
-        git clone --depth=1 https://github.com $GITHUB_WORKSPACE/AnyKernel3
+        git clone --depth=1 https://github.com AnyKernel3
 
     - name: Patch NetHunter Kernel Defconfig
       run: |
-        cd $GITHUB_WORKSPACE/kernel
+        cd kernel
         DEFCONFIG="arch/arm64/configs/gta3xlwifi_defconfig"
         
         sed -i 's/CONFIG_CFG80211=m/CONFIG_CFG80211=y/g' $DEFCONFIG || true
@@ -50,7 +50,7 @@ jobs:
 
     - name: Compile Kernel
       run: |
-        cd $GITHUB_WORKSPACE/kernel
+        cd kernel
         export PATH="$GITHUB_WORKSPACE/toolchain/gcc64/bin:$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
@@ -62,15 +62,15 @@ jobs:
 
     - name: Package with AnyKernel3
       run: |
-        if [ -f $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image.gz-dtb ]; then
-          cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image.gz-dtb $GITHUB_WORKSPACE/AnyKernel3/
-        elif [ -f $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image ]; then
-          cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image $GITHUB_WORKSPACE/AnyKernel3/
+        if [ -f kernel/arch/arm64/boot/Image.gz-dtb ]; then
+          cp kernel/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+        elif [ -f kernel/arch/arm64/boot/Image ]; then
+          cp kernel/arch/arm64/boot/Image AnyKernel3/
         else
           echo "Kernel image compilation failed entirely." && exit 1
         fi
         
-        cd $GITHUB_WORKSPACE/AnyKernel3
+        cd AnyKernel3
         zip -r9 ../NetHunter-Kernel-gta3xlwifi.zip * -x .git* README.md
 
     - name: Upload Finished Kernel Zip
